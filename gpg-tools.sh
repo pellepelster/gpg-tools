@@ -103,22 +103,22 @@ generate_master_key() {
 cat >${TEMP_DIR}/master_key_script << EOF
      %echo Generating a basic OpenPGP key
      Key-Type: DSA
-     Key-Length: 1024
+     Key-Length: 4096
      Subkey-Type: ELG-E
-     Subkey-Length: 1024
-     Name-Real: Joe Tester
-     Name-Comment: with stupid passphrase
-     Name-Email: joe@foo.bar
-     Expire-Date: 0
-     Passphrase: abc
+     Subkey-Length: 4096
+     Name-Real: ${GPG_KEY_REALNAME}
+     Name-Comment: ${GPG_KEY_COMMENT:-none}
+     Name-Email: ${GPG_KEY_EMAIL}
+     Expire-Date: 2y
+     Passphrase: ${GPG_KEY_PASSWORD}
      %commit
      %echo done"
 EOF
-gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script
+gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
+dialog --tailbox ${TEMP_DIR}/gpg.log 20 68
 }
 
 GPG_KEY_FORM_ERRORS=""
-GPG_KEY_FORM_VALID=1
 
 validate_gpg_key_form_data() {
   GPG_KEY_FORM_ERRORS=""
@@ -135,8 +135,8 @@ validate_gpg_key_form_data() {
       GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Please enter the password twice\n"
     fi
   fi
-  GPG_KEY_FORM_VALID=0
 }
+
 enter_master_key_data() {
   dialog --title "GPG key data" \
        --ok-label "Ok" \
@@ -156,7 +156,7 @@ enter_master_key_data() {
     GPG_KEY_PASSWORD=${form_data[3]:1}
     GPG_KEY_PASSWORD_RETYPE=${form_data[4]:1}
     validate_gpg_key_form_data
-    if [ ${GPG_KEY_FORM_VALID} -eq 0 ]; then
+    if [[ ! -z "${GPG_KEY_FORM_ERRORS// }" ]]; then
       dialog --title "Error" --msgbox "Please correct the following errors:\n${GPG_KEY_FORM_ERRORS}" 10 78
     fi
   fi
