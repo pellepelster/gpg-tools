@@ -118,9 +118,24 @@ gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script
 }
 
 GPG_KEY_FORM_ERRORS=""
+GPG_KEY_FORM_VALID=1
+
 validate_gpg_key_form_data() {
-  GPG_KEY_FORM_ERRORS="fdsfdsfds"
-  echo 0
+  GPG_KEY_FORM_ERRORS=""
+  if [[ -z "${GPG_KEY_REALNAME// }" ]]; then
+    GPG_KEY_FORM_ERRORS="- A realname is needed\n"
+  fi
+  if [[ -z "${GPG_KEY_EMAIL// }" ]]; then
+    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- A valid email address is needed\n"
+  fi
+  if [[ -z "${GPG_KEY_PASSWORD// }" ]]; then
+    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- A password is needed to protect your key\n"
+  else
+    if [[ -z "${GPG_KEY_PASSWORD_RETYPE// }" ]]; then
+      GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Please enter the password twice\n"
+    fi
+  fi
+  GPG_KEY_FORM_VALID=0
 }
 enter_master_key_data() {
   dialog --title "GPG key data" \
@@ -140,8 +155,9 @@ enter_master_key_data() {
     GPG_KEY_COMMENT=${form_data[2]:1}
     GPG_KEY_PASSWORD=${form_data[3]:1}
     GPG_KEY_PASSWORD_RETYPE=${form_data[4]:1}
-    if [ $(validate_gpg_key_form_data) -ne 0 ]; then
-      dialog --msgbox "${GPG_KEY_FORM_ERRORS}" 10 78
+    validate_gpg_key_form_data
+    if [ ${GPG_KEY_FORM_VALID} -eq 0 ]; then
+      dialog --title "Error" --msgbox "Please correct the following errors:\n${GPG_KEY_FORM_ERRORS}" 10 78
     fi
   fi
 }
@@ -153,19 +169,17 @@ main_menu() {
            --menu "Move using [UP] [DOWN], [Enter] to select" 17 70 10\
         Master "Mount USB drive for master key storage"\
         Export "Mount USB drive for export key storage"\
-        EnterMasterKeyData "Enter all data needed for key generation"\
-        GenerateMasterKey "Generate a new master keypair"\
-        Info "Show information"\
-        Quit "Exit demo program" 2> $ANSWER
+        KeyData "Enter data needed for key generation"\
+        Generate "Generate a new master keypair"\
+        Quit "Exit GPG tools" 2> $ANSWER
     opt=${?}
     if [ $opt != 0 ]; then rm $ANSWER; exit; fi
     menuitem=$(cat $ANSWER)
     case $menuitem in
         Master) mount_target_device ${MASTER_KEYS_DIR} "master keys";;
         Export) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
-        GenerateMasterKey) generate_master_key;;
-        EnterMasterKeyData) enter_master_key_data;;
-        Info) information;;
+        Generate) generate_master_key;;
+        KeyData) enter_master_key_data;;
         Quit)
           exit;;
     esac
@@ -182,12 +196,8 @@ cleanup_environment() {
   sudo umount -f ${TEMP_DIR}
   rm -rf ${TEMP_DIR}
 }
-trap cleanup_environment EXIT
 
-if [ -d ${TEMP_DIR} ]; then
-  echo "temp dir '${TEMP_DIR} already exists, aborting"
-  exit 1
-else
+initialize_environment() {
   set -e
   mkdir -p ${TEMP_DIR}
   sudo mount -t tmpfs -o size=2M tmpfs ${TEMP_DIR}
@@ -195,6 +205,15 @@ else
   mkdir -p ${MASTER_KEYS_DIR}
   mkdir -p ${EXPORT_KEYS_DIR}
   set +e
+}
+
+trap cleanup_environment EXIT
+
+if [ -d ${TEMP_DIR} ]; then
+  echo "temp dir '${TEMP_DIR} already exists, aborting"
+  exit 1
+else
+  initialize_environment
 fi
 
 
