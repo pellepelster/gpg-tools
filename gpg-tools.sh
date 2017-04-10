@@ -19,6 +19,7 @@ GPG_KEY_PASSWORD=${GPG_KEY_PASSWORD:-}
 GPG_KEY_PASSWORD_RETYPE=${GPG_KEY_PASSWORD_RETYPE:-}
 
 declare -A UNMOUNTED_DEVICE_IDS
+declare -A ALL_DEVICES
 
 update_devices() {
   for device_link in $(find ${DEVICES_BASE_PATH} -name "usb-*"); do
@@ -28,6 +29,7 @@ update_devices() {
     if [ $(is_mounted ${device}) -eq 0 ]; then
       UNMOUNTED_DEVICE_IDS[${device}]=${device_id}
     fi
+    ALL_DEVICES[${device}]=${device_id}
   done
 }
 
@@ -47,8 +49,18 @@ mount_target_device() {
   mount_name=$2
 
   if [ $(is_mounted ${mount_path}) -ne 0 ]; then
-    dialog --msgbox "Storage for ${mount_name} already mounted" 10 40
-    return
+    device=$(df | grep ${mount_path} | awk '{ print $1 }')
+    dialog --title "Unmount?" --yesno "${ALL_DEVICES[${device}]} already mounted as storage for ${mount_name} do you want to unmount first?" 10 68
+    response=$?
+    case $response in
+      0)
+        if ! sudo umount ${device} ; then
+          dialog --msgbox "failed to unmount ${device}" 10 78
+          return
+        fi
+        ;;
+      *) return;;
+    esac
   fi
 
   if [ ! -z ${UNMOUNTED_DEVICE_IDS+x} ] && [ ${#UNMOUNTED_DEVICE_IDS[@]} -eq 0 ]; then
@@ -71,7 +83,7 @@ mount_target_device() {
       Quit) rm $ANSWER; exit;;
       *)
         if [ $(is_mounted ${device}) ]; then
-          if sudo umount ${device} ; then
+          if sudo sync && sudo umount ${device} ; then
             dialog --msgbox "failed to unmount ${device}" 10 78
             return
           fi
@@ -162,10 +174,10 @@ main_menu() {
 cleanup_environment() {
   sync
   if [ $(is_mounted ${MASTER_KEYS_DIR}) -ne 0 ]; then
-    sudo umount -f ${MASTER_KEYS_DIR}
+    sudo sync && sudo umount -f ${MASTER_KEYS_DIR}
   fi
   if [ $(is_mounted ${EXPORT_KEYS_DIR}) -ne 0 ]; then
-    sudo umount -f ${EXPORT_KEYS_DIR}
+    sudo sync && sudo umount -f ${EXPORT_KEYS_DIR}
   fi
   sudo umount -f ${TEMP_DIR}
   rm -rf ${TEMP_DIR}
