@@ -102,20 +102,21 @@ mount_target_device() {
 generate_master_key() {
 cat >${TEMP_DIR}/master_key_script << EOF
      %echo Generating a basic OpenPGP key
-     Key-Type: DSA
+     Key-Type: RSA
      Key-Length: 4096
-     Subkey-Type: ELG-E
+     Subkey-Type: RSA
      Subkey-Length: 4096
+     Subkey-Usage: sign
      Name-Real: ${GPG_KEY_REALNAME}
      Name-Comment: ${GPG_KEY_COMMENT:-none}
      Name-Email: ${GPG_KEY_EMAIL}
-     Expire-Date: 2y
+     Expire-Date: 0
      Passphrase: ${GPG_KEY_PASSWORD}
      %commit
      %echo done"
 EOF
 gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
-dialog --tailbox ${TEMP_DIR}/gpg.log 20 68
+dialog --exit-label "OK" --tailbox ${TEMP_DIR}/gpg.log 20 68
 }
 
 GPG_KEY_FORM_ERRORS=""
@@ -202,6 +203,7 @@ initialize_environment() {
   mkdir -p ${TEMP_DIR}
   sudo mount -t tmpfs -o size=2M tmpfs ${TEMP_DIR}
   sudo chown $USER ${TEMP_DIR}
+  sudo chmod 700 ${TEMP_DIR}
   mkdir -p ${MASTER_KEYS_DIR}
   mkdir -p ${EXPORT_KEYS_DIR}
   set +e
