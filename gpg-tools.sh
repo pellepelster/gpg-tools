@@ -185,24 +185,8 @@ while true; do
   main_menu
 done
 
-exit
-
-if [ -d ${MASTER_KEY_DIR} ] ; then
-  echo "gpg master key environment '${MASTER_KEY_DIR}' already exists, aborting"
-  exit 1
-fi
-
-echo "copy current gpg environment '${CURRENT_DIR}' to master key environment '${MASTER_KEY_DIR}'"
-mkdir ${MASTER_KEY_DIR}
-chmod 700 ${MASTER_KEY_DIR}
-cp ${CURRENT_DIR}/*.gpg ${MASTER_KEY_DIR}
-cp ${CURRENT_DIR}/random_seed ${MASTER_KEY_DIR}
-
-echo "importing key '${MASTER_KEY_PRIVATE}'"
-gpg --homedir ${MASTER_KEY_DIR} --import  ${MASTER_KEY_PUBLIC} ${MASTER_KEY_PRIVATE}
-
-
+#gpg --homedir ${MASTER_KEY_DIR} --import  ${MASTER_KEY_PUBLIC} ${MASTER_KEY_PRIVATE}
 #gpg --homedir ${MASTER_KEY_DIR} --edit-key ${KEY_ID} 
 #gpg --homedir ${MASTER_KEY_DIR} ${KEY_ID} --export-secret-subkeys
-# gpg --import subkeys
+#gpg --import subkeys
 #rm -rf ${MASTER_KEY_DIR}
