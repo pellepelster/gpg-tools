@@ -33,6 +33,18 @@ update_devices() {
   done
 }
 
+declare -A ALL_GPG_KEYS
+
+update_gpg_keys() {
+
+  for secret_key in "$(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep "sec::")"; do
+
+    local key_id=$(echo ${secret_key} | awk -F "::" '{ print $2 }' | awk -F ":" '{ print $3 }')
+    local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
+    ALL_GPG_KEYS[${key_id}]=${key_name}
+  done
+}
+
 get_devices_menuitems() {
   for device in "${!UNMOUNTED_DEVICE_IDS[@]}"
   do
@@ -182,12 +194,11 @@ enter_master_key_data() {
 
 export_secret_keys() {
 
-  for secret_key in "$(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep "sec::")"; do
-
-    local key_id=$(echo ${secret_key} | awk -F "::" '{ print $2 }' | awk -F ":" '{ print $3 }')
+  for key_id in "${!ALL_GPG_KEYS[@]}"
+  do
     local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
-
     local export_base_name=${key_id}
+
     gpg --homedir ${TEMP_DIR} --export --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.public.gpg-key"
     gpg --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.private.gpg-key"
 
@@ -198,7 +209,6 @@ export_secret_keys() {
       rm -f ${revocation_script}
     fi
     echo ${revocation_script}
-    sleep 5
     touch ${revocation_script}
     echo "y" > ${revocation_script}
     echo "${code}" >> ${revocation_script}
@@ -207,8 +217,6 @@ export_secret_keys() {
     echo "${GPG_KEY_PASSWORD}" >> ${revocation_script}
 
     gpg --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${EXPORT_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
-
-    sleep 10
   done
 }
 
@@ -231,7 +239,7 @@ main_menu() {
         MountExport) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
         Generate) generate_master_key;;
         KeyData) enter_master_key_data;;
-        Export) export_secret_keys;;
+        Export) update_gpg_keys && export_secret_keys;;
         Quit)
           exit;;
     esac
