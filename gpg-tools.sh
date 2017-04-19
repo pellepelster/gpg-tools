@@ -217,21 +217,21 @@ main_menu() {
            --title "Main Menu" \
            --cancel-label "Quit" \
            --menu "Move using [UP] [DOWN], [Enter] to select" 17 70 10 \
-        Master "Mount USB drive for master key storage" \
-        Export "Mount USB drive for export key storage" \
+        MountMaster "Mount USB drive for master key storage" \
+        MountExport "Mount USB drive for export key storage" \
         KeyData "Enter data needed for key generation" \
         Generate "Generate a new master keypair" \
-        ExportSecrets "Export secret keys" \
+        Export "Export secret keys" \
         Quit "Exit GPG tools" 2> $ANSWER
     opt=${?}
     if [ $opt != 0 ]; then rm $ANSWER; exit; fi
     menuitem=$(cat $ANSWER)
     case $menuitem in
-        Master) mount_target_device ${MASTER_KEYS_DIR} "master keys";;
-        Export) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
+        MountMaster) mount_target_device ${MASTER_KEYS_DIR} "master keys";;
+        MountExport) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
         Generate) generate_master_key;;
         KeyData) enter_master_key_data;;
-        ExportSecrets) export_secret_keys;;
+        Export) export_secret_keys;;
         Quit)
           exit;;
     esac
