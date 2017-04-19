@@ -8,10 +8,7 @@ MASTER_KEYS_DIR="${TEMP_DIR}/keys_master"
 EXPORT_KEYS_DIR="${TEMP_DIR}/keys_export"
 
 DEVICES_BASE_PATH="/dev/disk/by-id"
-MASTER_KEY_PREFIX=${USER}
 
-MASTER_KEY_PRIVATE="${MASTER_KEYS_DIR}/${MASTER_KEY_PREFIX}-private.key"
-MASTER_KEY_PUBLIC="${MASTER_KEYS_DIR}/${MASTER_KEY_PREFIX}-public.key"
 GPG_KEY_REALNAME=${GPG_KEY_REALNAME:-}
 GPG_KEY_EMAIL=${GPG_KEY_EMAIL:-}
 GPG_KEY_COMMENT=${GPG_KEY_COMMENT:-}
@@ -37,7 +34,7 @@ declare -A ALL_GPG_KEYS
 
 update_gpg_keys() {
 
-  for secret_key in "$(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep "sec::")"; do
+  for secret_key in $(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep 'sec::' | tr ' ' '_'); do
 
     local key_id=$(echo ${secret_key} | awk -F "::" '{ print $2 }' | awk -F ":" '{ print $3 }')
     local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
@@ -196,15 +193,15 @@ export_secret_keys() {
 
   for key_id in "${!ALL_GPG_KEYS[@]}"
   do
-    local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
+    local key_name="${ALL_GPG_KEYS[${key_id}]}"
     local export_base_name=${key_id}
 
-    gpg --homedir ${TEMP_DIR} --export --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.public.gpg-key"
-    gpg --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.private.gpg-key"
+    gpg --homedir ${TEMP_DIR} --export --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.public.gpg-key"
+    gpg --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.private.gpg-key"
 
     local code="0"
     local reason=""
-    local revocation_script=${TEMP_DIR}/gpg_revocation_script
+    local revocation_script=${TEMP_DIR}/${key_id}.gpg_revocation_script
     if [ -f ${revocation_script} ] ; then
       rm -f ${revocation_script}
     fi
@@ -216,7 +213,20 @@ export_secret_keys() {
     echo "y" >> ${revocation_script}
     echo "${GPG_KEY_PASSWORD}" >> ${revocation_script}
 
-    gpg --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${EXPORT_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
+    gpg --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${MASTER_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
+    rm -f ${revocation_script}
+  done
+}
+
+export_secret_subkeys() {
+
+  for key_id in "${!ALL_GPG_KEYS[@]}"
+  do
+    local key_name="${ALL_GPG_KEYS[${key_id}]}"
+    local export_base_name=${key_id}
+
+    gpg --homedir ${TEMP_DIR} --armor --export-secret-subkeys ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.subkeys.gpg-key"
+
   done
 }
 
@@ -229,7 +239,8 @@ main_menu() {
         MountExport "Mount USB drive for export key storage" \
         KeyData "Enter data needed for key generation" \
         Generate "Generate a new master keypair" \
-        Export "Export secret keys" \
+        SecretKeyExport "Export secret keys" \
+        SubkeysExport "Export secret subkeys" \
         Quit "Exit GPG tools" 2> $ANSWER
     opt=${?}
     if [ $opt != 0 ]; then rm $ANSWER; exit; fi
@@ -239,7 +250,8 @@ main_menu() {
         MountExport) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
         Generate) generate_master_key;;
         KeyData) enter_master_key_data;;
-        Export) update_gpg_keys && export_secret_keys;;
+        SecretKeyExport) update_gpg_keys && export_secret_keys;;
+        SubkeysExport) update_gpg_keys && export_secret_subkeys;;
         Quit)
           exit;;
     esac
