@@ -100,8 +100,16 @@ mount_target_device() {
 }
 
 generate_master_key() {
+
+  validate_gpg_key_form_data
+
+  if [[ ! -z "${GPG_KEY_FORM_ERRORS// }" ]]; then
+    dialog --title "Error" --msgbox "Please correct the following errorsi before generating the key:\n${GPG_KEY_FORM_ERRORS}" 10 78
+    return
+  fi
+
 cat >${TEMP_DIR}/master_key_script << EOF
-     %echo Generating a basic OpenPGP key
+     %echo generating key...
      Key-Type: RSA
      Key-Length: 4096
      Subkey-Type: RSA
@@ -113,28 +121,37 @@ cat >${TEMP_DIR}/master_key_script << EOF
      Expire-Date: 0
      Passphrase: ${GPG_KEY_PASSWORD}
      %commit
-     %echo done"
+     %echo ...done"
 EOF
-gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
-dialog --exit-label "OK" --tailbox ${TEMP_DIR}/gpg.log 20 68
+  gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
+  dialog --exit-label "OK" --tailbox ${TEMP_DIR}/gpg.log 20 68
 }
 
 GPG_KEY_FORM_ERRORS=""
 
 validate_gpg_key_form_data() {
   GPG_KEY_FORM_ERRORS=""
+
   if [[ -z "${GPG_KEY_REALNAME// }" ]]; then
     GPG_KEY_FORM_ERRORS="- A realname is needed\n"
   fi
+
   if [[ -z "${GPG_KEY_EMAIL// }" ]]; then
     GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- A valid email address is needed\n"
   fi
+
   if [[ -z "${GPG_KEY_PASSWORD// }" ]]; then
     GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- A password is needed to protect your key\n"
-  else
-    if [[ -z "${GPG_KEY_PASSWORD_RETYPE// }" ]]; then
-      GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Please enter the password twice\n"
-    fi
+    return
+  fi
+
+  if [[ -z "${GPG_KEY_PASSWORD_RETYPE// }" ]]; then
+    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Please enter the password twice\n"
+    return
+  fi
+
+  if [ "${GPG_KEY_PASSWORD}" -ne "${GPG_KEY_PASSWORD_RETYPE}" ]; then
+    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Passwords do not match\n"
   fi
 }
 
@@ -163,15 +180,48 @@ enter_master_key_data() {
   fi
 }
 
+export_secret_keys() {
+
+  for secret_key in "$(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep "sec::")"; do
+
+    local key_id=$(echo ${secret_key} | awk -F "::" '{ print $2 }' | awk -F ":" '{ print $3 }')
+    local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
+
+    local export_base_name=${key_id}
+    gpg --homedir ${TEMP_DIR} --export --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.public.gpg-key"
+    gpg --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.private.gpg-key"
+
+    local code="0"
+    local reason=""
+    local revocation_script=${TEMP_DIR}/gpg_revocation_script
+    if [ -f ${revocation_script} ] ; then
+      rm -f ${revocation_script}
+    fi
+    echo ${revocation_script}
+    sleep 5
+    touch ${revocation_script}
+    echo "y" > ${revocation_script}
+    echo "${code}" >> ${revocation_script}
+    echo "${reason}" >> ${revocation_script}
+    echo "y" >> ${revocation_script}
+    echo "${GPG_KEY_PASSWORD}" >> ${revocation_script}
+
+    gpg --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${EXPORT_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
+
+    sleep 10
+  done
+}
+
 main_menu() {
     dialog --backtitle "GPG master key editor" \
            --title "Main Menu" \
            --cancel-label "Quit" \
-           --menu "Move using [UP] [DOWN], [Enter] to select" 17 70 10\
-        Master "Mount USB drive for master key storage"\
-        Export "Mount USB drive for export key storage"\
-        KeyData "Enter data needed for key generation"\
-        Generate "Generate a new master keypair"\
+           --menu "Move using [UP] [DOWN], [Enter] to select" 17 70 10 \
+        Master "Mount USB drive for master key storage" \
+        Export "Mount USB drive for export key storage" \
+        KeyData "Enter data needed for key generation" \
+        Generate "Generate a new master keypair" \
+        ExportSecrets "Export secret keys" \
         Quit "Exit GPG tools" 2> $ANSWER
     opt=${?}
     if [ $opt != 0 ]; then rm $ANSWER; exit; fi
@@ -181,6 +231,7 @@ main_menu() {
         Export) mount_target_device ${EXPORT_KEYS_DIR} "exported keys";;
         Generate) generate_master_key;;
         KeyData) enter_master_key_data;;
+        ExportSecrets) export_secret_keys;;
         Quit)
           exit;;
     esac
