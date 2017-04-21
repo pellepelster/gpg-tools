@@ -114,6 +114,7 @@ function calculate_checksum() {
 function customize() {
   echo "adding gpgtools"
   cp gpg-tools.sh ${BUILD}/usr/local/bin/
+  cp extra.rules ${BUILD}/etc/udev/rules.d/
   echo "eval \$(gpg-agent --pinentry-program /usr/local/bin/pinentry-tty --daemon)" >> ${BUILD}/etc/profile
 }
 
