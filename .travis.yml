@@ -1,7 +1,14 @@
 language: bash
 sudo: required
 before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y squashfs-tools mkisofs advancecomp
+- sudo apt-get -qq update
+- sudo apt-get install -y squashfs-tools mkisofs advancecomp
 script:
-    - sudo ./run iso
+- sudo ./run iso
+deploy:
+  provider: releases
+  api_key:
+    secure: DY4uX44FLko+iKj8iMLpM5nG4iRlUE9MpNT/JYrAmshDSvKWdI/zMhmHsjnMRbqnIvPZTZwgMpvXhUPTuBXO82EzT81BDbhf+gmFh0JvU8VGhOz5/q3B62PFx3aq4N9hSeNWcDNRQPT7QpCYtnxawXzzZOKx3vuiJPVFXpAT36Ps091F+xeUwwdsLmYibJwGM0wCGPMbLZF3XfOkpN52RQ1W8cAwj9j5R1h5ZWAoTt9VStKJc/B4MbvQ2n2meaXouEv6ZhrGZzkpRvWSgYnz/Rgz8nNQhW7SFJI5QR0FUhXKheoFqtFhRtjJFJTGmsxx5pNE2pcKwvxtXqCpYpMFsBXVJIadngHBfmgxIr5e88lrl9c36JKv89FohBE8Pvp9xV1LQGRgp8/v5FwKfU30KVYLMmInG9olq8axIKNFNAG8B3saC3UXIih50L83XF9RTi/X+rlkDJQRtzQ1FloYmGW+gtDJhe54ORrtepewk28ZCwTYcmY+V1fmP4kxAgXO4xGbetXU2h3vxyfP5Wp3NKsCgn5oPphB9OcspOpgBCchrhWk/UOaBSwIP+6AWsUbl3ohLVYd+W9t6MtShEIIlH14WrObWFcimoIz61e+sTApmoSJVddxg7V0D/1nsZVasHKFKLSMWooNJyWabFzhW8lPWiBv8YmA3lS5uXIidXY=
+  file: gpg-tools.iso
+  on:
+    repo: pellepelster/gpg-tools
