@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VERSION=${TRAVIS_TAG:-latest}
 
 set -eu
 
@@ -10,7 +11,7 @@ readonly MIRROR_URL=http://tinycorelinux.net/8.x/x86
 readonly DIST="${DIR}/dist"
 readonly BUILD="${DIR}/build"
 readonly DOWNLOADS="${DIR}/downloads"
-readonly ISOFILE="gpg-tools.iso"
+readonly ISOFILE="gpg-tools-${VERSION}.iso"
 
 function build_iso() {
   prepare
