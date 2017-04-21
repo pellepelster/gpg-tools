@@ -140,7 +140,7 @@ cat >${TEMP_DIR}/master_key_script << EOF
      %commit
      %echo ...done"
 EOF
-  ${GPG} ${GPG_OPTIONS} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
+  ${GPG} ${GPG_OPTIONS} -v --batch --gen-key ${TEMP_DIR}/master_key_script &> ${TEMP_DIR}/gpg.log &
   dialog --exit-label "OK" --tailbox ${TEMP_DIR}/gpg.log 20 68
 }
 
@@ -167,9 +167,9 @@ validate_gpg_key_form_data() {
     return
   fi
 
-  if [ "${GPG_KEY_PASSWORD}" -ne "${GPG_KEY_PASSWORD_RETYPE}" ]; then
-    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Passwords do not match\n"
-  fi
+#  if [[ "${GPG_KEY_PASSWORD}" -ne "${GPG_KEY_PASSWORD_RETYPE}" ]]; then
+#    GPG_KEY_FORM_ERRORS="${GPG_KEY_FORM_ERRORS}- Passwords do not match\n"
+#  fi
 }
 
 enter_master_key_data() {

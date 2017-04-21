@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 set -eu
 
 readonly EXTENSIONS=(bash dialog gnupg)
 
 readonly MIRROR_URL=http://tinycorelinux.net/8.x/x86
-readonly DIST=./dist
-readonly BUILD=./build
-readonly DOWNLOADS=./downloads
-readonly ISOFILE=Core-current.iso
+readonly DIST="${DIR}/dist"
+readonly BUILD="${DIR}/build"
+readonly DOWNLOADS="${DIR}/downloads"
+readonly ISOFILE="gpg-tools.iso"
 
 function build_iso() {
   prepare
@@ -60,7 +62,7 @@ function download_tcz() {
 }
 
 function explode_iso() {
-  local url=${MIRROR_URL}/release/${ISOFILE}
+  local url="${MIRROR_URL}/release/Core-current.iso"
   local iso=${DOWNLOADS}/${url##*/}
   local source=tmp
 
@@ -99,11 +101,11 @@ function remaster_iso() {
   mv core.gz ${DIST}/boot
   mkisofs -l -J -R -V TC-custom -no-emul-boot -boot-load-size 4 \
     -boot-info-table -b boot/isolinux/isolinux.bin \
-    -c boot/isolinux/boot.cat -o gpg-tools.iso ${DIST}
+    -c boot/isolinux/boot.cat -o ${ISOFILE} ${DIST}
 }
 
 function calculate_checksum() {
-  local md5=($(md5sum gpg-tools.iso))
+  local md5=($(md5sum ${ISOFILE}))
 
   echo "remastering done. The md5 checksum of the new iso is: ${md5}"
 }
@@ -111,8 +113,11 @@ function calculate_checksum() {
 function customize() {
   echo "adding gpgtools"
   cp gpg-tools.sh ${BUILD}/usr/local/bin/
-  echo "eval \$(gpg-agent --daemon)" >> ${BUILD}/etc/profile
-  #  echo "gpg-tools.sh &" >> $BUILD/opt/bootlocal.sh
+  echo "eval \$(gpg-agent --pinentry-program /usr/local/bin/pinentry-tty --daemon)" >> ${BUILD}/etc/profile
+}
+
+function qemu() {
+  qemu-system-x86_64 -device virtio-rng-pci -cdrom ${ISOFILE}
 }
 
 function show_usage {
@@ -123,6 +128,7 @@ function show_usage {
 CMD=${1:-}
 shift || true
 case ${CMD} in
+  qemu) qemu ;;
   iso) build_iso ;;
   *) show_usage ;;
 esac
