@@ -1,4 +1,4 @@
 language: bash
 sudo: required
 script:
-    - ./run iso
+    - sudo ./run iso
