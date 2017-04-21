@@ -1,7 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -u
 
 TEMP_DIR="/tmp/gpg"
+
+GPG=$(which gpg2)
+GPG_OPTIONS="--homedir ${TEMP_DIR}"
+
 ANSWER="${TEMP_DIR}/answer.$$"
 
 MASTER_KEYS_DIR="${TEMP_DIR}/keys_master"
@@ -19,6 +23,10 @@ declare -A UNMOUNTED_DEVICE_IDS
 declare -A ALL_DEVICES
 
 update_devices() {
+  if [ ! -d ${DEVICES_BASE_PATH} ]; then
+    return
+  fi
+
   for device_link in $(find ${DEVICES_BASE_PATH} -name "usb-*"); do
     local device_id=$(basename ${device_link})
     device_id=${device_id:4}
@@ -34,7 +42,7 @@ declare -A ALL_GPG_KEYS
 
 update_gpg_keys() {
 
-  for secret_key in $(gpg --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep 'sec::' | tr ' ' '_'); do
+  for secret_key in $(${GPG} --homedir ${TEMP_DIR} --list-secret-keys --with-colons | grep 'sec::' | tr ' ' '_'); do
 
     local key_id=$(echo ${secret_key} | awk -F "::" '{ print $2 }' | awk -F ":" '{ print $3 }')
     local key_name="$(echo ${secret_key} | awk -F '::' '{ print $4 }')"
@@ -132,7 +140,7 @@ cat >${TEMP_DIR}/master_key_script << EOF
      %commit
      %echo ...done"
 EOF
-  gpg --homedir ${TEMP_DIR} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
+  ${GPG} ${GPG_OPTIONS} --batch --gen-key ${TEMP_DIR}/master_key_script 2> ${TEMP_DIR}/gpg.log &
   dialog --exit-label "OK" --tailbox ${TEMP_DIR}/gpg.log 20 68
 }
 
@@ -196,8 +204,8 @@ export_secret_keys() {
     local key_name="${ALL_GPG_KEYS[${key_id}]}"
     local export_base_name=${key_id}
 
-    gpg --homedir ${TEMP_DIR} --export --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.public.gpg-key"
-    gpg --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.private.gpg-key"
+    ${GPG} --homedir ${TEMP_DIR} --export --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.public.gpg-key"
+    ${GPG} --homedir ${TEMP_DIR} --export-secret-subkeys --armor ${key_id} > "${MASTER_KEYS_DIR}/${export_base_name}.private.gpg-key"
 
     local code="0"
     local reason=""
@@ -213,7 +221,7 @@ export_secret_keys() {
     echo "y" >> ${revocation_script}
     echo "${GPG_KEY_PASSWORD}" >> ${revocation_script}
 
-    gpg --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${MASTER_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
+    ${GPG} --homedir ${TEMP_DIR} --no-tty --command-fd 0 --status-fd 2 --armor --output "${MASTER_KEYS_DIR}/${export_base_name}.gpg-revocation-certificate" --gen-revoke ${key_id} < ${revocation_script}
     rm -f ${revocation_script}
   done
 }
@@ -225,7 +233,7 @@ export_secret_subkeys() {
     local key_name="${ALL_GPG_KEYS[${key_id}]}"
     local export_base_name=${key_id}
 
-    gpg --homedir ${TEMP_DIR} --armor --export-secret-subkeys ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.subkeys.gpg-key"
+    ${GPG} --homedir ${TEMP_DIR} --armor --export-secret-subkeys ${key_id} > "${EXPORT_KEYS_DIR}/${export_base_name}.subkeys.gpg-key"
 
   done
 }
